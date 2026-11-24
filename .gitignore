@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Kane CLI local artifacts (evidence packs + run outputs stay local)
+.testmuai/
+tests/output-*/
