@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
@@ -35,5 +36,10 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+      # deploy-pages queries the artifacts API right after upload; on this
+      # repo the listing lags the upload by more than a second, so it saw
+      # 0 artifacts three runs in a row. Give the listing time to catch up.
+      - name: Wait for artifact listing to propagate
+        run: sleep 60
       - id: deployment
         uses: actions/deploy-pages@v4
