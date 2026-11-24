@@ -3,7 +3,11 @@ name: Kane CLI verification
 # Runs the Kane flows in tests/ against the live GitHub Pages deploy on every
 # push. Needs two repo secrets (set under Settings > Secrets and variables >
 # Actions): TESTMU_USERNAME and TESTMU_ACCESS_KEY from the TestMu AI account.
-# If the secrets are not set, the Kane job is skipped instead of failing.
+# If the secrets are not set, the Kane steps are skipped instead of failing.
+#
+# NOTE: the `secrets` context is NOT available in a job-level `if`
+# expression (GitHub rejects the workflow at parse time: "Unrecognized
+# named-value: 'secrets'"), so the gate lives in a step instead.
 on:
   push:
     branches: [master]
@@ -11,20 +15,36 @@ on:
 
 jobs:
   kane:
-    if: ${{ secrets.TESTMU_USERNAME != '' && secrets.TESTMU_ACCESS_KEY != '' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Check TestMu secrets
+        id: check
+        env:
+          TESTMU_USERNAME: ${{ secrets.TESTMU_USERNAME }}
+          TESTMU_ACCESS_KEY: ${{ secrets.TESTMU_ACCESS_KEY }}
+        run: |
+          if [ -z "$TESTMU_USERNAME" ] || [ -z "$TESTMU_ACCESS_KEY" ]; then
+            echo "set=false" >> "$GITHUB_OUTPUT"
+            echo "TestMu secrets not set - skipping Kane flows."
+          else
+            echo "set=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.check.outputs.set == 'true'
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.set == 'true'
         with:
           node-version: 24
       - run: npm install -g @testmuai/kane-cli
+        if: steps.check.outputs.set == 'true'
       - name: Kane login
+        if: steps.check.outputs.set == 'true'
         env:
           TESTMU_USERNAME: ${{ secrets.TESTMU_USERNAME }}
           TESTMU_ACCESS_KEY: ${{ secrets.TESTMU_ACCESS_KEY }}
         run: kane-cli login --username "$TESTMU_USERNAME" --access-key "$TESTMU_ACCESS_KEY"
       - name: Run Kane flows
+        if: steps.check.outputs.set == 'true'
         run: ./scripts/verify.sh
       - name: Upload evidence on failure
         if: failure()
