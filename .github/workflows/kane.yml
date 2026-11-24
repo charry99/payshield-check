@@ -1,0 +1,35 @@
+name: Kane CLI verification
+
+# Runs the Kane flows in tests/ against the live GitHub Pages deploy on every
+# push. Needs two repo secrets (set under Settings > Secrets and variables >
+# Actions): TESTMU_USERNAME and TESTMU_ACCESS_KEY from the TestMu AI account.
+# If the secrets are not set, the Kane job is skipped instead of failing.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  kane:
+    if: ${{ secrets.TESTMU_USERNAME != '' && secrets.TESTMU_ACCESS_KEY != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g @testmuai/kane-cli
+      - name: Kane login
+        env:
+          TESTMU_USERNAME: ${{ secrets.TESTMU_USERNAME }}
+          TESTMU_ACCESS_KEY: ${{ secrets.TESTMU_ACCESS_KEY }}
+        run: kane-cli login --username "$TESTMU_USERNAME" --access-key "$TESTMU_ACCESS_KEY"
+      - name: Run Kane flows
+        run: ./scripts/verify.sh
+      - name: Upload evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kane-evidence
+          path: '**/*.evidence'
+          if-no-files-found: ignore
